@@ -21,28 +21,59 @@ phases:
       - echo "  LAUNCH_TEMPLATE_ID: $LAUNCH_TEMPLATE_ID"
       - echo "  ASG_NAME: $ASG_NAME"
       - |
-        if [ -f "ami.env" ]; then
-          echo "Loading AMI ID from build artifacts..."
-          source ami.env
-          echo "AMI_ID found: $AMI_ID"
-        elif [ -f "manifest.json" ]; then
-          echo "Loading AMI ID from manifest..."
-          AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json | cut -d':' -f2)
-          echo "AMI ID from manifest: $AMI_ID"
-        else
-          echo "ERROR: No AMI ID found in artifacts"
+        # Validate required environment variables
+        if [ -z "$LAUNCH_TEMPLATE_ID" ]; then
+          echo "ERROR: LAUNCH_TEMPLATE_ID is not set"
+          exit 1
+        fi
+        if [ -z "$ASG_NAME" ]; then
+          echo "ERROR: ASG_NAME is not set"
           exit 1
         fi
       - |
-        if [ -z "$AMI_ID" ]; then
-          echo "ERROR: AMI_ID is empty"
+        # Extract AMI ID from artifacts
+        AMI_ID=""
+        if [ -f "ami.env" ]; then
+          echo "Loading AMI ID from build artifacts..."
+          source ami.env
+          echo "AMI_ID found in ami.env: $AMI_ID"
+        elif [ -f "manifest.json" ]; then
+          echo "Loading AMI ID from manifest..."
+          AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json 2>/dev/null | cut -d':' -f2)
+          echo "AMI ID from manifest: $AMI_ID"
+        else
+          echo "ERROR: No AMI ID found in artifacts (ami.env or manifest.json)"
+          echo "Available files:"
+          ls -la
           exit 1
         fi
-      - echo "AMI ID to deploy: $AMI_ID"
+      - |
+        if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "null" ]; then
+          echo "ERROR: AMI_ID is empty or null"
+          echo "Contents of ami.env:"
+          cat ami.env 2>/dev/null || echo "ami.env not found"
+          echo "Contents of manifest.json:"
+          cat manifest.json 2>/dev/null || echo "manifest.json not found"
+          exit 1
+        fi
+      - echo "Validated AMI ID to deploy: $AMI_ID"
 
   build:
     commands:
       - echo "Deploy phase started on $(date)"
+      - echo "Verifying AMI exists and is available..."
+      - |
+        # Verify AMI exists and is available
+        AMI_STATE=$(aws ec2 describe-images \
+          --image-ids $AMI_ID \
+          --query 'Images[0].State' \
+          --output text 2>/dev/null)
+
+        if [ "$AMI_STATE" != "available" ]; then
+          echo "ERROR: AMI $AMI_ID is not available (state: $AMI_STATE)"
+          exit 1
+        fi
+        echo "AMI $AMI_ID is available for deployment"
       - echo "Updating launch template with new AMI..."
       - |
         # Get current launch template version
@@ -50,15 +81,26 @@ phases:
           --launch-template-id $LAUNCH_TEMPLATE_ID \
           --query 'LaunchTemplateVersions[0].VersionNumber' \
           --output text)
+
+        if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "None" ]; then
+          echo "ERROR: Failed to get current launch template version"
+          exit 1
+        fi
         echo "Current launch template version: $CURRENT_VERSION"
       - |
         # Create new launch template version with new AMI
+        echo "Creating new launch template version with AMI: $AMI_ID"
         NEW_VERSION=$(aws ec2 create-launch-template-version \
           --launch-template-id $LAUNCH_TEMPLATE_ID \
           --source-version $CURRENT_VERSION \
-          --launch-template-data '{"ImageId":"'$AMI_ID'"}' \
+          --launch-template-data "{\"ImageId\":\"$AMI_ID\"}" \
           --query 'LaunchTemplateVersion.VersionNumber' \
           --output text)
+
+        if [ -z "$NEW_VERSION" ] || [ "$NEW_VERSION" = "None" ]; then
+          echo "ERROR: Failed to create new launch template version"
+          exit 1
+        fi
         echo "Created new launch template version: $NEW_VERSION"
       - |
         # Update ASG to use new launch template version
@@ -66,19 +108,36 @@ phases:
         aws autoscaling update-auto-scaling-group \
           --auto-scaling-group-name $ASG_NAME \
           --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION
+
+        if [ $? -ne 0 ]; then
+          echo "ERROR: Failed to update Auto Scaling Group"
+          exit 1
+        fi
         echo "Auto Scaling Group updated successfully"
       - |
         # Start instance refresh for rolling deployment
         echo "Starting instance refresh for rolling deployment..."
         REFRESH_ID=$(aws autoscaling start-instance-refresh \
           --auto-scaling-group-name $ASG_NAME \
-          --preferences MinHealthyPercentage=90,InstanceWarmup=300 \
+          --preferences '{"MinHealthyPercentage":90,"InstanceWarmup":300,"CheckpointPercentages":[50,100],"CheckpointDelay":300}' \
           --query 'InstanceRefreshId' \
           --output text)
+
+        if [ -z "$REFRESH_ID" ] || [ "$REFRESH_ID" = "None" ]; then
+          echo "ERROR: Failed to start instance refresh"
+          exit 1
+        fi
         echo "Instance refresh started with ID: $REFRESH_ID"
+
+        # Save deployment info
+        echo "REFRESH_ID=$REFRESH_ID" > deployment.env
+        echo "AMI_ID=$AMI_ID" >> deployment.env
+        echo "NEW_VERSION=$NEW_VERSION" >> deployment.env
+        echo "DEPLOYMENT_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> deployment.env
       - echo "Deployment completed successfully"
 
 artifacts:
   files:
+    - "deployment.env"
     - "*.log"
   name: deploy-artifacts

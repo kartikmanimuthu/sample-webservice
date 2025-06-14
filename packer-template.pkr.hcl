@@ -147,11 +147,20 @@ build {
     ]
   }
 
+  # Create destination directory first
+  provisioner "shell" {
+    inline = [
+      "echo 'Creating destination directory...'",
+      "mkdir -p /tmp/sample-app",
+      "echo 'Directory created'"
+    ]
+  }
+
   # Copy application files
   provisioner "file" {
     source      = "./"
-    destination = "/tmp/sample-app/"
-    except      = ["packer-template.pkr.hcl", "buildspec.yml", "deploy-buildspec.yml", "README.md", "packer.log", "manifest.json", "ami.env", "packer_1.11.2_linux_amd64.zip"]
+    destination = "/tmp/sample-app"
+    except      = ["packer-template.pkr.hcl", "buildspec.yml", "deploy-buildspec.yml", "README.md", "packer.log", "manifest.json", "ami.env", "packer_1.11.2_linux_amd64.zip", "LICENSE.txt"]
   }
 
   # Setup application
@@ -159,10 +168,18 @@ build {
     inline = [
       "echo 'Setting up application...'",
       "sudo mkdir -p /opt/app",
-      "sudo cp -r /tmp/sample-app/* /opt/app/",
+      "echo 'Listing files in /tmp/sample-app:'",
+      "ls -la /tmp/sample-app/",
+      "sudo cp -r /tmp/sample-app/* /opt/app/ 2>/dev/null || sudo cp -r /tmp/sample-app/. /opt/app/",
       "sudo chown -R ec2-user:ec2-user /opt/app",
       "cd /opt/app",
-      "npm install --production",
+      "echo 'Listing files in /opt/app:'",
+      "ls -la",
+      "if [ -f package.json ]; then",
+      "  npm install --production",
+      "else",
+      "  echo 'No package.json found, skipping npm install'",
+      "fi",
       "echo 'Application setup completed'"
     ]
   }

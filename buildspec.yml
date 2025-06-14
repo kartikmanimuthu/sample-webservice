@@ -56,15 +56,37 @@ phases:
         fi
       - echo "Extracting AMI ID from Packer output..."
       - |
-        AMI_ID=$(grep 'artifact,0,id' packer.log | cut -d: -f2)
+        # Try multiple methods to extract AMI ID
+        AMI_ID=""
+
+        # Method 1: From machine-readable output
+        if [ -z "$AMI_ID" ]; then
+          AMI_ID=$(grep 'artifact,0,id' packer.log | cut -d, -f6 | cut -d: -f2 | tail -1)
+        fi
+
+        # Method 2: From manifest.json if it exists
+        if [ -z "$AMI_ID" ] && [ -f "manifest.json" ]; then
+          AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json 2>/dev/null | cut -d: -f2)
+        fi
+
+        # Method 3: From packer output using regex
+        if [ -z "$AMI_ID" ]; then
+          AMI_ID=$(grep -o 'ami-[a-z0-9]*' packer.log | tail -1)
+        fi
+
         if [ -z "$AMI_ID" ]; then
           echo "ERROR: Failed to extract AMI ID from Packer output"
           echo "Packer log contents:"
           cat packer.log
+          echo "Manifest contents (if exists):"
+          cat manifest.json 2>/dev/null || echo "No manifest.json found"
           exit 1
         fi
+
         echo "AMI_ID=$AMI_ID" > ami.env
-        echo "AMI ID: $AMI_ID"
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ami.env
+        echo "BUILD_TOOL=Packer" >> ami.env
+        echo "Successfully extracted AMI ID: $AMI_ID"
 
 artifacts:
   files:
