@@ -19,6 +19,8 @@ phases:
       - ls -la
       - echo "Installing jq for JSON parsing"
       - yum install -y jq
+      - echo "Initializing Packer plugins..."
+      - packer init packer-template.pkr.hcl
 
   build:
     commands:
