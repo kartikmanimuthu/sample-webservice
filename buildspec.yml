@@ -19,26 +19,43 @@ phases:
       - ls -la
       - echo "Installing jq for JSON parsing"
       - yum install -y jq
-      - echo "Listing sample-app directory:"
-      - ls -la sample-app/
 
   build:
     commands:
       - echo "Build phase started on $(date)"
       - echo "Current directory $(pwd)"
       - echo "Validating Packer template..."
-      - cd sample-app && packer validate -var "project_name=$PROJECT_NAME" -var "environment=$ENVIRONMENT" -var "region=$AWS_DEFAULT_REGION" -var "vpc_id=$VPC_ID" -var "subnet_id=$SUBNET_ID" -var "security_group_id=$SECURITY_GROUP_ID" -var "instance_profile=$INSTANCE_PROFILE" packer-template.pkr.hcl
+      - |
+        packer validate \
+          -var "project_name=$PROJECT_NAME" \
+          -var "environment=$ENVIRONMENT" \
+          -var "region=$AWS_DEFAULT_REGION" \
+          -var "vpc_id=$VPC_ID" \
+          -var "subnet_id=$SUBNET_ID" \
+          -var "security_group_id=$SECURITY_GROUP_ID" \
+          -var "instance_profile=$INSTANCE_PROFILE" \
+          sample-app/packer-template.pkr.hcl
       - echo "Building AMI with Packer..."
-      - cd sample-app && packer build -machine-readable -var "project_name=$PROJECT_NAME" -var "environment=$ENVIRONMENT" -var "region=$AWS_DEFAULT_REGION" -var "vpc_id=$VPC_ID" -var "subnet_id=$SUBNET_ID" -var "security_group_id=$SECURITY_GROUP_ID" -var "instance_profile=$INSTANCE_PROFILE" packer-template.pkr.hcl | tee packer.log
+      - |
+        packer build -machine-readable \
+          -var "project_name=$PROJECT_NAME" \
+          -var "environment=$ENVIRONMENT" \
+          -var "region=$AWS_DEFAULT_REGION" \
+          -var "vpc_id=$VPC_ID" \
+          -var "subnet_id=$SUBNET_ID" \
+          -var "security_group_id=$SECURITY_GROUP_ID" \
+          -var "instance_profile=$INSTANCE_PROFILE" \
+          sample-app/packer-template.pkr.hcl | tee packer.log
       - echo "Extracting AMI ID from Packer output..."
-      - cd sample-app && AMI_ID=$(grep 'artifact,0,id' packer.log | cut -d: -f2)
-      - cd sample-app && echo "AMI_ID=$AMI_ID" > ami.env
-      - cd sample-app && echo "AMI ID $AMI_ID"
+      - |
+        AMI_ID=$(grep 'artifact,0,id' packer.log | cut -d: -f2)
+        echo "AMI_ID=$AMI_ID" > ami.env
+        echo "AMI ID: $AMI_ID"
 
 artifacts:
   files:
-    - "sample-app/ami.env"
-    - "sample-app/manifest.json"
+    - "ami.env"
+    - "manifest.json"
   name: packer-artifacts
 
 cache:

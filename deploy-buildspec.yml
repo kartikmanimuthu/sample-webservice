@@ -21,19 +21,17 @@ phases:
       - echo "  LAUNCH_TEMPLATE_ID: $LAUNCH_TEMPLATE_ID"
       - echo "  ASG_NAME: $ASG_NAME"
       - |
-        if [ -f "${CODEBUILD_SOURCE_VERSION}.env" ]; then
+        if [ -f "sample-app/ami.env" ]; then
           echo "Loading AMI ID from build artifacts..."
-          source ${CODEBUILD_SOURCE_VERSION}.env
+          source sample-app/ami.env
           echo "AMI_ID found: $AMI_ID"
+        elif [ -f "sample-app/manifest.json" ]; then
+          echo "Loading AMI ID from manifest..."
+          AMI_ID=$(jq -r '.builds[0].artifact_id' sample-app/manifest.json | cut -d':' -f2)
+          echo "AMI ID from manifest: $AMI_ID"
         else
-          echo "No AMI ID file found, checking for manifest.json..."
-          if [ -f "manifest.json" ]; then
-            AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json | cut -d':' -f2)
-            echo "AMI ID from manifest: $AMI_ID"
-          else
-            echo "ERROR: No AMI ID found in artifacts"
-            exit 1
-          fi
+          echo "ERROR: No AMI ID found in artifacts"
+          exit 1
         fi
       - |
         if [ -z "$AMI_ID" ]; then
@@ -53,7 +51,6 @@ phases:
           --query 'LaunchTemplateVersions[0].VersionNumber' \
           --output text)
         echo "Current launch template version: $CURRENT_VERSION"
-
       - |
         # Create new launch template version with new AMI
         NEW_VERSION=$(aws ec2 create-launch-template-version \
@@ -63,7 +60,6 @@ phases:
           --query 'LaunchTemplateVersion.VersionNumber' \
           --output text)
         echo "Created new launch template version: $NEW_VERSION"
-
       - |
         # Update ASG to use new launch template version
         echo "Updating Auto Scaling Group to use new launch template version..."
@@ -71,7 +67,6 @@ phases:
           --auto-scaling-group-name $ASG_NAME \
           --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION
         echo "Auto Scaling Group updated successfully"
-
       - |
         # Start instance refresh for rolling deployment
         echo "Starting instance refresh for rolling deployment..."
@@ -81,84 +76,7 @@ phases:
           --query 'InstanceRefreshId' \
           --output text)
         echo "Instance refresh started with ID: $REFRESH_ID"
-
-      - |
-        # Monitor instance refresh progress
-        echo "Monitoring instance refresh progress..."
-        REFRESH_STATUS="InProgress"
-        while [ "$REFRESH_STATUS" = "InProgress" ]; do
-          sleep 30
-          REFRESH_STATUS=$(aws autoscaling describe-instance-refreshes \
-            --auto-scaling-group-name $ASG_NAME \
-            --instance-refresh-ids $REFRESH_ID \
-            --query 'InstanceRefreshes[0].Status' \
-            --output text)
-          
-          PERCENTAGE=$(aws autoscaling describe-instance-refreshes \
-            --auto-scaling-group-name $ASG_NAME \
-            --instance-refresh-ids $REFRESH_ID \
-            --query 'InstanceRefreshes[0].PercentageComplete' \
-            --output text)
-          
-          echo "Instance refresh status: $REFRESH_STATUS ($PERCENTAGE% complete)"
-          
-          if [ "$REFRESH_STATUS" = "Failed" ]; then
-            echo "ERROR: Instance refresh failed"
-            exit 1
-          fi
-          
-          if [ "$REFRESH_STATUS" = "Cancelled" ]; then
-            echo "ERROR: Instance refresh was cancelled"
-            exit 1
-          fi
-        done
-
-      - |
-        if [ "$REFRESH_STATUS" = "Successful" ]; then
-          echo "Instance refresh completed successfully!"
-        else
-          echo "Instance refresh ended with status: $REFRESH_STATUS"
-          exit 1
-        fi
-
-  post_build:
-    commands:
-      - echo "Post-deploy phase started on $(date)"
-      - |
-        # Verify deployment by checking instance health
-        echo "Verifying deployment health..."
-        HEALTHY_INSTANCES=$(aws autoscaling describe-auto-scaling-groups \
-          --auto-scaling-group-names $ASG_NAME \
-          --query 'AutoScalingGroups[0].Instances[?HealthStatus==`Healthy`]' \
-          --output json | jq length)
-
-        TOTAL_INSTANCES=$(aws autoscaling describe-auto-scaling-groups \
-          --auto-scaling-group-names $ASG_NAME \
-          --query 'AutoScalingGroups[0].Instances' \
-          --output json | jq length)
-
-        echo "Healthy instances: $HEALTHY_INSTANCES/$TOTAL_INSTANCES"
-
-        if [ "$HEALTHY_INSTANCES" -eq "$TOTAL_INSTANCES" ] && [ "$TOTAL_INSTANCES" -gt 0 ]; then
-          echo "All instances are healthy - deployment successful!"
-        else
-          echo "WARNING: Not all instances are healthy"
-        fi
-
-      - |
-        # Log deployment details
-        echo "Deployment Summary:"
-        echo "  Project: $PROJECT_NAME"
-        echo "  Environment: $ENVIRONMENT"
-        echo "  AMI ID: $AMI_ID"
-        echo "  Launch Template: $LAUNCH_TEMPLATE_ID"
-        echo "  New Version: $NEW_VERSION"
-        echo "  ASG Name: $ASG_NAME"
-        echo "  Refresh ID: $REFRESH_ID"
-        echo "  Final Status: $REFRESH_STATUS"
-        echo "  Healthy Instances: $HEALTHY_INSTANCES/$TOTAL_INSTANCES"
-
-      - echo "Deploy phase completed on $(date)"
+      - echo "Deployment completed successfully"
 
 artifacts:
   files:

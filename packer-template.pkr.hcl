@@ -150,7 +150,7 @@ build {
 
   # Copy application files
   provisioner "file" {
-    source      = "./"
+    source      = "sample-app/"
     destination = "/tmp/sample-app/"
     except      = ["packer-template.pkr.hcl", "buildspec.yml", "deploy-buildspec.yml", "README.md"]
   }
@@ -168,4 +168,4 @@ build {
     ]
   }
 
-  # Create systemd service 
+  # Create systemd service
