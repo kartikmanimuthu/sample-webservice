@@ -13,7 +13,7 @@ phases:
   pre_build:
     commands:
       - echo "Pre-deploy phase started on $(date)"
-      - echo "Current directory: $(pwd)"
+      - echo "Current directory $(pwd)"
       - echo "Listing files:"
       - ls -la
       - echo "Environment variables:"
@@ -119,9 +119,9 @@ phases:
       - |
         # Start instance refresh for rolling deployment
         echo "Starting instance refresh for rolling deployment..."
-        REFRESH_ID=$(aws autoscaling start-instance-refresh \\
-          --auto-scaling-group-name $ASG_NAME \\
-          --query 'InstanceRefreshId' \\
+        REFRESH_ID=$(aws autoscaling start-instance-refresh \
+          --auto-scaling-group-name $ASG_NAME \
+          --query 'InstanceRefreshId' \
           --output text)
 
         if [ -z "$REFRESH_ID" ] || [ "$REFRESH_ID" = "null" ]; then
