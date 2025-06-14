@@ -13,8 +13,8 @@ phases:
 
   pre_build:
     commands:
-      - echo "Pre-build phase started on $(date)"
-      - echo "Current directory: $(pwd)"
+      - echo "Pre-build phase started on - $(date)"
+      - echo "Current directory - $(pwd)"
       - echo "Listing files:"
       - ls -la
       - echo "Installing jq for JSON parsing"
@@ -24,9 +24,9 @@ phases:
 
   build:
     commands:
-      - echo "Build phase started on $(date)"
+      - echo "Build phase started on - $(date)"
       - cd sample-app
-      - echo "Current directory: $(pwd)"
+      - echo "Current directory - $(pwd)"
       - ls -la
       - echo "Validating Packer template..."
       - packer validate -var "project_name=$PROJECT_NAME" -var "environment=$ENVIRONMENT" -var "region=$AWS_DEFAULT_REGION" -var "vpc_id=$VPC_ID" -var "subnet_id=$SUBNET_ID" -var "security_group_id=$SECURITY_GROUP_ID" -var "instance_profile=$INSTANCE_PROFILE" packer-template.pkr.hcl
