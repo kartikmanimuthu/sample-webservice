@@ -150,7 +150,7 @@ build {
 
   # Copy application files
   provisioner "file" {
-    source      = "sample-app/"
+    source      = "app/"
     destination = "/tmp/sample-app/"
   }
 
