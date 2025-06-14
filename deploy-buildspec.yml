@@ -35,20 +35,37 @@ phases:
       - |
         # Extract AMI ID from artifacts
         AMI_ID=""
+        echo "Checking for AMI artifacts..."
+        echo "Files in current directory:"
+        ls -la
+
         if [ -f "ami.env" ]; then
-          echo "Loading AMI ID from build artifacts..."
-          source ami.env
-          echo "AMI_ID found in ami.env - $AMI_ID"
-        elif [ -f "manifest.json" ]; then
-          echo "Loading AMI ID from manifest..."
+          echo "Found ami.env file, reading contents..."
+          cat ami.env
+          echo "Extracting AMI_ID from ami.env..."
+          AMI_ID=$(grep -E "^AMI_ID=" ami.env | cut -d'=' -f2 | tr -d '"' | tr -d "'" | xargs)
+          echo "AMI_ID extracted from ami.env: '$AMI_ID'"
+        fi
+
+        # Fallback to manifest.json if ami.env didn't work
+        if [ -z "$AMI_ID" ] && [ -f "manifest.json" ]; then
+          echo "AMI_ID not found in ami.env, trying manifest.json..."
+          cat manifest.json
           AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json 2>/dev/null | cut -d':' -f2)
-          echo "AMI ID from manifest: $AMI_ID"
-        else
-          echo "ERROR - No AMI ID found in artifacts (ami.env or manifest.json)"
-          echo "Available files-"
-          ls -la
+          echo "AMI_ID extracted from manifest.json: '$AMI_ID'"
+        fi
+
+        # Final validation
+        if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "null" ]; then
+          echo "ERROR - No valid AMI_ID found in artifacts"
+          echo "Contents of ami.env (if exists):"
+          cat ami.env 2>/dev/null || echo "ami.env not readable"
+          echo "Contents of manifest.json (if exists):"
+          cat manifest.json 2>/dev/null || echo "manifest.json not readable"
           exit 1
         fi
+
+        echo "Successfully extracted AMI_ID: $AMI_ID"
       - |
         if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "null" ]; then
           echo "ERROR - AMI_ID is empty or null"
