@@ -70,9 +70,12 @@ source "amazon-ebs" "app" {
   vpc_id        = var.vpc_id
   subnet_id     = var.subnet_id
   security_group_id = var.security_group_id
+  associate_public_ip_address = true # Ensure a public IP is assigned
   
   source_ami    = data.amazon-ami.base.id
   ssh_username  = "ec2-user"
+  ssh_timeout   = "10m" # Increase SSH timeout
+  ssh_interface = "public_ip" # Use public IP for SSH
   iam_instance_profile = var.instance_profile
   
   ami_description = "Custom AMI built with Packer for ${var.project_name} ${var.environment}"
@@ -216,6 +219,7 @@ build {
   provisioner "shell" {
     inline = [
       "echo 'Installing CloudWatch agent...'",
+      "sudo dnf install -y wget", # Install wget
       "wget https://s3.${var.region}.amazonaws.com/amazoncloudwatch-agent-${var.region}/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm",
       "sudo rpm -U ./amazon-cloudwatch-agent.rpm",
       "rm -f ./amazon-cloudwatch-agent.rpm",
