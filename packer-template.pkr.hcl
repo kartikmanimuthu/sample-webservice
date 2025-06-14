@@ -150,8 +150,9 @@ build {
 
   # Copy application files
   provisioner "file" {
-    source      = "app/"
+    source      = "./"
     destination = "/tmp/sample-app/"
+    except      = ["packer-template.pkr.hcl", "buildspec.yml", "deploy-buildspec.yml", "README.md"]
   }
 
   # Setup application
@@ -167,121 +168,4 @@ build {
     ]
   }
 
-  # Create systemd service
-  provisioner "shell" {
-    inline = [
-      "echo 'Creating systemd service...'",
-      "sudo tee /etc/systemd/system/${var.project_name}-app.service > /dev/null <<EOF",
-      "[Unit]",
-      "Description=${var.project_name} Application",
-      "After=network.target",
-      "",
-      "[Service]",
-      "Type=simple",
-      "User=ec2-user",
-      "WorkingDirectory=/opt/app",
-      "ExecStart=/usr/bin/node server.js",
-      "Restart=always",
-      "RestartSec=10",
-      "Environment=NODE_ENV=${var.environment}",
-      "Environment=BUILD_TOOL=Packer",
-      "",
-      "[Install]",
-      "WantedBy=multi-user.target",
-      "EOF",
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable ${var.project_name}-app",
-      "echo 'Systemd service created and enabled'"
-    ]
-  }
-
-  # Install and configure CloudWatch agent
-  provisioner "shell" {
-    inline = [
-      "echo 'Installing CloudWatch agent...'",
-      "wget https://s3.${var.region}.amazonaws.com/amazoncloudwatch-agent-${var.region}/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm",
-      "sudo rpm -U ./amazon-cloudwatch-agent.rpm",
-      "rm -f ./amazon-cloudwatch-agent.rpm",
-      "echo 'CloudWatch agent installed'"
-    ]
-  }
-
-  # Configure CloudWatch agent
-  provisioner "shell" {
-    inline = [
-      "echo 'Configuring CloudWatch agent...'",
-      "sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null <<EOF",
-      "{",
-      "    \"logs\": {",
-      "        \"logs_collected\": {",
-      "            \"files\": {",
-      "                \"collect_list\": [",
-      "                    {",
-      "                        \"file_path\": \"/var/log/messages\",",
-      "                        \"log_group_name\": \"/aws/ec2/${var.project_name}/packer-app\",",
-      "                        \"log_stream_name\": \"{instance_id}/messages\"",
-      "                    }",
-      "                ]",
-      "            }",
-      "        }",
-      "    },",
-      "    \"metrics\": {",
-      "        \"namespace\": \"${var.project_name}/EC2\",",
-      "        \"metrics_collected\": {",
-      "            \"cpu\": {",
-      "                \"measurement\": [",
-      "                    \"cpu_usage_idle\",",
-      "                    \"cpu_usage_iowait\",",
-      "                    \"cpu_usage_user\",",
-      "                    \"cpu_usage_system\"",
-      "                ],",
-      "                \"metrics_collection_interval\": 60",
-      "            },",
-      "            \"disk\": {",
-      "                \"measurement\": [",
-      "                    \"used_percent\"",
-      "                ],",
-      "                \"metrics_collection_interval\": 60,",
-      "                \"resources\": [",
-      "                    \"*\"",
-      "                ]",
-      "            },",
-      "            \"mem\": {",
-      "                \"measurement\": [",
-      "                    \"mem_used_percent\"",
-      "                ],",
-      "                \"metrics_collection_interval\": 60",
-      "            }",
-      "        }",
-      "    }",
-      "}",
-      "EOF",
-      "echo 'CloudWatch agent configuration completed'"
-    ]
-  }
-
-  # Final cleanup and testing
-  provisioner "shell" {
-    inline = [
-      "echo 'Performing final cleanup and testing...'",
-      "cd /opt/app",
-      "npm test --if-present || echo 'No tests defined'",
-      "sudo yum clean all",
-      "sudo rm -rf /tmp/*",
-      "sudo rm -rf /var/tmp/*",
-      "echo 'AMI preparation completed successfully'"
-    ]
-  }
-
-  # Generate manifest for tracking
-  post-processor "manifest" {
-    output = "manifest.json"
-    strip_path = true
-    custom_data = {
-      build_tool = "Packer"
-      project_name = var.project_name
-      environment = var.environment
-      build_date = timestamp()
-    }
-  }
-}
+  # Create systemd service 

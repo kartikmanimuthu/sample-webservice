@@ -32,7 +32,7 @@ app.get('/health', (req, res) => {
             total: process.memoryUsage().heapTotal / 1024 / 1024
         }
     };
-    
+
     res.status(200).json(healthStatus);
 });
 
@@ -73,7 +73,7 @@ app.get('/info', (req, res) => {
             availability_zone: process.env.AWS_AZ || 'unknown'
         }
     };
-    
+
     res.json(info);
 });
 
@@ -92,7 +92,7 @@ app.get('/metrics', (req, res) => {
         environment: environment,
         build_tool: process.env.BUILD_TOOL || 'unknown'
     };
-    
+
     res.json(metrics);
 });
 
