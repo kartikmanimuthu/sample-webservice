@@ -272,18 +272,16 @@ build {
       "echo 'AMI preparation completed successfully'"
     ]
   }
+
   # Generate manifest for tracking
   post-processor "manifest" {
     output = "manifest.json"
     strip_path = true
     custom_data = {
       build_tool = "Packer"
-      build_date = timestamp()
-      environment = var.environment
       project_name = var.project_name
+      environment = var.environment
+      build_date = timestamp()
     }
   }
 }
-
-
-}  }    }      build_date = timestamp()      environment = var.environment      project_name = var.project_name
