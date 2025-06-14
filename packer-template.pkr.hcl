@@ -150,9 +150,9 @@ build {
 
   # Copy application files
   provisioner "file" {
-    source      = "sample-app/"
+    source      = "./"
     destination = "/tmp/sample-app/"
-    except      = ["packer-template.pkr.hcl", "buildspec.yml", "deploy-buildspec.yml", "README.md"]
+    except      = ["packer-template.pkr.hcl", "buildspec.yml", "deploy-buildspec.yml", "README.md", "packer.log", "manifest.json", "ami.env", "packer_1.11.2_linux_amd64.zip"]
   }
 
   # Setup application

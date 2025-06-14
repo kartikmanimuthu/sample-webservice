@@ -21,13 +21,13 @@ phases:
       - echo "  LAUNCH_TEMPLATE_ID: $LAUNCH_TEMPLATE_ID"
       - echo "  ASG_NAME: $ASG_NAME"
       - |
-        if [ -f "sample-app/ami.env" ]; then
+        if [ -f "ami.env" ]; then
           echo "Loading AMI ID from build artifacts..."
-          source sample-app/ami.env
+          source ami.env
           echo "AMI_ID found: $AMI_ID"
-        elif [ -f "sample-app/manifest.json" ]; then
+        elif [ -f "manifest.json" ]; then
           echo "Loading AMI ID from manifest..."
-          AMI_ID=$(jq -r '.builds[0].artifact_id' sample-app/manifest.json | cut -d':' -f2)
+          AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json | cut -d':' -f2)
           echo "AMI ID from manifest: $AMI_ID"
         else
           echo "ERROR: No AMI ID found in artifacts"
