@@ -17,11 +17,11 @@ phases:
       - echo "Listing files:"
       - ls -la
       - echo "Environment variables:"
-      - echo "  AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
-      - echo "  PROJECT_NAME: $PROJECT_NAME"
-      - echo "  ENVIRONMENT: $ENVIRONMENT"
-      - echo "  LAUNCH_TEMPLATE_ID: $LAUNCH_TEMPLATE_ID"
-      - echo "  ASG_NAME: $ASG_NAME"
+      - echo "  AWS_DEFAULT_REGION - $AWS_DEFAULT_REGION"
+      - echo "  PROJECT_NAME - $PROJECT_NAME"
+      - echo "  ENVIRONMENT - $ENVIRONMENT"
+      - echo "  LAUNCH_TEMPLATE_ID - $LAUNCH_TEMPLATE_ID"
+      - echo "  ASG_NAME - $ASG_NAME"
       - |
         # Validate required environment variables
         if [ -z "$LAUNCH_TEMPLATE_ID" ]; then
