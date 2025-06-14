@@ -14,9 +14,9 @@ phases:
     commands:
       - echo "Pre-deploy phase started on $(date)"
       - echo "Current directory $(pwd)"
-      - echo "Listing files:"
+      - echo "Listing files-"
       - ls -la
-      - echo "Environment variables:"
+      - echo "Environment variables-"
       - echo "  AWS_DEFAULT_REGION - $AWS_DEFAULT_REGION"
       - echo "  PROJECT_NAME - $PROJECT_NAME"
       - echo "  ENVIRONMENT - $ENVIRONMENT"
@@ -38,23 +38,23 @@ phases:
         if [ -f "ami.env" ]; then
           echo "Loading AMI ID from build artifacts..."
           source ami.env
-          echo "AMI_ID found in ami.env: $AMI_ID"
+          echo "AMI_ID found in ami.env - $AMI_ID"
         elif [ -f "manifest.json" ]; then
           echo "Loading AMI ID from manifest..."
           AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json 2>/dev/null | cut -d':' -f2)
           echo "AMI ID from manifest: $AMI_ID"
         else
-          echo "ERROR: No AMI ID found in artifacts (ami.env or manifest.json)"
-          echo "Available files:"
+          echo "ERROR - No AMI ID found in artifacts (ami.env or manifest.json)"
+          echo "Available files-"
           ls -la
           exit 1
         fi
       - |
         if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "null" ]; then
-          echo "ERROR: AMI_ID is empty or null"
-          echo "Contents of ami.env:"
+          echo "ERROR - AMI_ID is empty or null"
+          echo "Contents of ami.env-"
           cat ami.env 2>/dev/null || echo "ami.env not found"
-          echo "Contents of manifest.json:"
+          echo "Contents of manifest.json-"
           cat manifest.json 2>/dev/null || echo "manifest.json not found"
           exit 1
         fi
@@ -72,7 +72,7 @@ phases:
           --output text 2>/dev/null)
 
         if [ "$AMI_STATE" != "available" ]; then
-          echo "ERROR: AMI $AMI_ID is not available (state: $AMI_STATE)"
+          echo "ERROR - AMI $AMI_ID is not available (state - $AMI_STATE)"
           exit 1
         fi
         echo "AMI $AMI_ID is available for deployment"
@@ -85,13 +85,13 @@ phases:
           --output text)
 
         if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "None" ]; then
-          echo "ERROR: Failed to get current launch template version"
+          echo "ERROR - Failed to get current launch template version"
           exit 1
         fi
         echo "Current launch template version: $CURRENT_VERSION"
       - |
         # Create new launch template version with new AMI
-        echo "Creating new launch template version with AMI: $AMI_ID"
+        echo "Creating new launch template version with AMI - $AMI_ID"
         NEW_VERSION=$(aws ec2 create-launch-template-version \
           --launch-template-id $LAUNCH_TEMPLATE_ID \
           --source-version $CURRENT_VERSION \
@@ -100,7 +100,7 @@ phases:
           --output text)
 
         if [ -z "$NEW_VERSION" ] || [ "$NEW_VERSION" = "None" ]; then
-          echo "ERROR: Failed to create new launch template version"
+          echo "ERROR - Failed to create new launch template version"
           exit 1
         fi
         echo "Created new launch template version: $NEW_VERSION"
@@ -112,7 +112,7 @@ phases:
           --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION
 
         if [ $? -ne 0 ]; then
-          echo "ERROR: Failed to update Auto Scaling Group"
+          echo "ERROR - Failed to update Auto Scaling Group"
           exit 1
         fi
         echo "Auto Scaling Group updated successfully"
@@ -125,10 +125,10 @@ phases:
           --output text)
 
         if [ -z "$REFRESH_ID" ] || [ "$REFRESH_ID" = "null" ]; then
-          echo "ERROR: Failed to start instance refresh"
+          echo "ERROR - Failed to start instance refresh"
           exit 1
         fi
-        echo "Instance refresh started with ID: $REFRESH_ID"
+        echo "Instance refresh started with ID - $REFRESH_ID"
 
         # Save deployment info
         echo "REFRESH_ID=$REFRESH_ID" > deployment.env
