@@ -48,9 +48,21 @@ phases:
           -var "security_group_id=$SECURITY_GROUP_ID" \
           -var "instance_profile=$INSTANCE_PROFILE" \
           packer-template.pkr.hcl | tee packer.log
+
+        if [ ${PIPESTATUS[0]} -ne 0 ]; then
+          echo "ERROR: Packer build failed!"
+          cat packer.log
+          exit 1
+        fi
       - echo "Extracting AMI ID from Packer output..."
       - |
         AMI_ID=$(grep 'artifact,0,id' packer.log | cut -d: -f2)
+        if [ -z "$AMI_ID" ]; then
+          echo "ERROR: Failed to extract AMI ID from Packer output"
+          echo "Packer log contents:"
+          cat packer.log
+          exit 1
+        fi
         echo "AMI_ID=$AMI_ID" > ami.env
         echo "AMI ID: $AMI_ID"
 
