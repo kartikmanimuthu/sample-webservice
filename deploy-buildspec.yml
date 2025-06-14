@@ -53,7 +53,7 @@ phases:
           --query 'LaunchTemplateVersions[0].VersionNumber' \
           --output text)
         echo "Current launch template version: $CURRENT_VERSION"
-      
+
       - |
         # Create new launch template version with new AMI
         NEW_VERSION=$(aws ec2 create-launch-template-version \
@@ -63,7 +63,7 @@ phases:
           --query 'LaunchTemplateVersion.VersionNumber' \
           --output text)
         echo "Created new launch template version: $NEW_VERSION"
-      
+
       - |
         # Update ASG to use new launch template version
         echo "Updating Auto Scaling Group to use new launch template version..."
@@ -71,7 +71,7 @@ phases:
           --auto-scaling-group-name $ASG_NAME \
           --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION
         echo "Auto Scaling Group updated successfully"
-      
+
       - |
         # Start instance refresh for rolling deployment
         echo "Starting instance refresh for rolling deployment..."
@@ -81,7 +81,7 @@ phases:
           --query 'InstanceRefreshId' \
           --output text)
         echo "Instance refresh started with ID: $REFRESH_ID"
-      
+
       - |
         # Monitor instance refresh progress
         echo "Monitoring instance refresh progress..."
@@ -112,7 +112,7 @@ phases:
             exit 1
           fi
         done
-      
+
       - |
         if [ "$REFRESH_STATUS" = "Successful" ]; then
           echo "Instance refresh completed successfully!"
@@ -131,20 +131,20 @@ phases:
           --auto-scaling-group-names $ASG_NAME \
           --query 'AutoScalingGroups[0].Instances[?HealthStatus==`Healthy`]' \
           --output json | jq length)
-        
+
         TOTAL_INSTANCES=$(aws autoscaling describe-auto-scaling-groups \
           --auto-scaling-group-names $ASG_NAME \
           --query 'AutoScalingGroups[0].Instances' \
           --output json | jq length)
-        
+
         echo "Healthy instances: $HEALTHY_INSTANCES/$TOTAL_INSTANCES"
-        
+
         if [ "$HEALTHY_INSTANCES" -eq "$TOTAL_INSTANCES" ] && [ "$TOTAL_INSTANCES" -gt 0 ]; then
           echo "All instances are healthy - deployment successful!"
         else
           echo "WARNING: Not all instances are healthy"
         fi
-      
+
       - |
         # Log deployment details
         echo "Deployment Summary:"
@@ -157,10 +157,10 @@ phases:
         echo "  Refresh ID: $REFRESH_ID"
         echo "  Final Status: $REFRESH_STATUS"
         echo "  Healthy Instances: $HEALTHY_INSTANCES/$TOTAL_INSTANCES"
-      
+
       - echo "Deploy phase completed on $(date)"
 
 artifacts:
   files:
-    - '*.log'
+    - "*.log"
   name: deploy-artifacts
