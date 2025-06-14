@@ -58,7 +58,7 @@ phases:
           cat manifest.json 2>/dev/null || echo "manifest.json not found"
           exit 1
         fi
-      - echo "Validated AMI ID to deploy: $AMI_ID"
+      - echo "Validated AMI ID to deploy - $AMI_ID"
 
   build:
     commands:
