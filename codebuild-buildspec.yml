@@ -92,7 +92,7 @@ artifacts:
   files:
     - "ami.env"
     - "manifest.json"
-    - "deploy-buildspec.yml"
+    - "codedeploy-buildspec.yml"
   name: packer-artifacts
 
 cache:
