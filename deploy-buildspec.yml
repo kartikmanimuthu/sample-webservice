@@ -95,6 +95,21 @@ phases:
         echo "AMI $AMI_ID is available for deployment"
       - echo "Updating launch template with new AMI..."
       - |
+        # Check current IAM permissions first
+        echo "Checking IAM permissions..."
+        CALLER_IDENTITY=$(aws sts get-caller-identity --query 'Arn' --output text 2>/dev/null || echo "Unable to get caller identity")
+        echo "Current IAM identity: $CALLER_IDENTITY"
+
+        # Try to describe the launch template to verify access
+        echo "Verifying launch template access..."
+        LAUNCH_TEMPLATE_NAME=$(aws ec2 describe-launch-templates --launch-template-ids $LAUNCH_TEMPLATE_ID --query 'LaunchTemplates[0].LaunchTemplateName' --output text 2>/dev/null || echo "null")
+        if [ "$LAUNCH_TEMPLATE_NAME" = "null" ]; then
+          echo "ERROR - Cannot access launch template $LAUNCH_TEMPLATE_ID"
+          echo "Required permissions: ec2:DescribeLaunchTemplates, ec2:CreateLaunchTemplateVersion"
+          exit 1
+        fi
+        echo "Launch template access verified: $LAUNCH_TEMPLATE_NAME"
+      - |
         # Get current launch template version
         CURRENT_VERSION=$(aws ec2 describe-launch-template-versions \
           --launch-template-id $LAUNCH_TEMPLATE_ID \
@@ -114,30 +129,77 @@ phases:
           --source-version $CURRENT_VERSION \
           --launch-template-data "{\"ImageId\":\"$AMI_ID\"}" \
           --query 'LaunchTemplateVersion.VersionNumber' \
-          --output text)
+          --output text 2>&1)
+
+        if [ $? -ne 0 ]; then
+          echo "ERROR - Failed to create new launch template version"
+          echo "AWS CLI output: $NEW_VERSION"
+          echo "Required permissions: ec2:CreateLaunchTemplateVersion"
+          exit 1
+        fi
 
         if [ -z "$NEW_VERSION" ] || [ "$NEW_VERSION" = "None" ]; then
-          echo "ERROR - Failed to create new launch template version"
+          echo "ERROR - Invalid launch template version returned: $NEW_VERSION"
           exit 1
         fi
         echo "Created new launch template version: $NEW_VERSION"
       - |
+        # Verify ASG access before attempting update
+        echo "Verifying Auto Scaling Group access..."
+        ASG_EXISTS=$(aws autoscaling describe-auto-scaling-groups \
+          --auto-scaling-group-names $ASG_NAME \
+          --query 'AutoScalingGroups[0].AutoScalingGroupName' \
+          --output text 2>/dev/null || echo "null")
+
+        if [ "$ASG_EXISTS" != "$ASG_NAME" ]; then
+          echo "ERROR - Cannot access Auto Scaling Group $ASG_NAME"
+          echo "Required permissions: autoscaling:DescribeAutoScalingGroups, autoscaling:UpdateAutoScalingGroup"
+          exit 1
+        fi
+        echo "Auto Scaling Group access verified"
+      - |
         # Update ASG to use new launch template version
         echo "Updating Auto Scaling Group to use new launch template version..."
-        aws autoscaling update-auto-scaling-group \
+        UPDATE_RESULT=$(aws autoscaling update-auto-scaling-group \
           --auto-scaling-group-name $ASG_NAME \
-          --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION
+          --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION 2>&1)
 
         if [ $? -ne 0 ]; then
           echo "ERROR - Failed to update Auto Scaling Group"
+          echo "AWS CLI output: $UPDATE_RESULT"
+          echo "Common causes:"
+          echo "  1. Missing IAM permission: autoscaling:UpdateAutoScalingGroup"
+          echo "  2. Missing IAM permission: iam:PassRole (for launch template)"
+          echo "  3. Missing IAM permission: ec2:RunInstances (for launch template)"
+          echo "Current IAM identity: $CALLER_IDENTITY"
           exit 1
         fi
         echo "Auto Scaling Group updated successfully"
+      - |
+        # Verify the update was successful
+        echo "Verifying Auto Scaling Group update..."
+        CURRENT_LT_VERSION=$(aws autoscaling describe-auto-scaling-groups \
+          --auto-scaling-group-names $ASG_NAME \
+          --query 'AutoScalingGroups[0].LaunchTemplate.Version' \
+          --output text)
+
+        if [ "$CURRENT_LT_VERSION" != "$NEW_VERSION" ]; then
+          echo "WARNING - ASG launch template version mismatch"
+          echo "Expected: $NEW_VERSION, Actual: $CURRENT_LT_VERSION"
+        else
+          echo "ASG successfully updated to use launch template version $NEW_VERSION"
+        fi
       - |
         # Start instance refresh for rolling deployment
         echo "Starting instance refresh for rolling deployment..."
         REFRESH_ID=$(aws autoscaling start-instance-refresh \
           --auto-scaling-group-name $ASG_NAME \
+          --preferences '{
+            "InstanceWarmup": 300,
+            "MinHealthyPercentage": 50,
+            "CheckpointDelay": 600,
+            "CheckpointPercentages": [50, 100]
+          }' \
           --query 'InstanceRefreshId' \
           --output text)
 
@@ -152,6 +214,8 @@ phases:
         echo "AMI_ID=$AMI_ID" >> deployment.env
         echo "NEW_VERSION=$NEW_VERSION" >> deployment.env
         echo "DEPLOYMENT_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> deployment.env
+        echo "LAUNCH_TEMPLATE_ID=$LAUNCH_TEMPLATE_ID" >> deployment.env
+        echo "ASG_NAME=$ASG_NAME" >> deployment.env
       - echo "Deployment completed successfully"
 
 artifacts:
