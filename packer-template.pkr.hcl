@@ -54,7 +54,7 @@ variable "instance_type" {
 # Data source for base AMI
 data "amazon-ami" "base" {
   filters = {
-    name                = "amzn2-ami-hvm-*-x86_64-gp2"
+    name                = "al2023-ami-*-x86_64"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
   }
@@ -110,7 +110,7 @@ build {
   provisioner "shell" {
     inline = [
       "echo 'Starting system update...'",
-      "sudo yum update -y",
+      "sudo dnf update -y",
       "echo 'System update completed'"
     ]
   }
@@ -119,7 +119,7 @@ build {
   provisioner "shell" {
     inline = [
       "echo 'Installing Docker...'",
-      "sudo yum install -y docker",
+      "sudo dnf install -y docker",
       "sudo systemctl start docker",
       "sudo systemctl enable docker",
       "sudo usermod -a -G docker ec2-user",
@@ -131,8 +131,7 @@ build {
   provisioner "shell" {
     inline = [
       "echo 'Installing Node.js...'",
-      "curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -",
-      "sudo yum install -y nodejs",
+      "sudo dnf install -y nodejs npm",
       "echo 'Node.js version:' $(node --version)",
       "echo 'NPM version:' $(npm --version)",
       "echo 'Node.js installation completed'"
@@ -143,7 +142,7 @@ build {
   provisioner "shell" {
     inline = [
       "echo 'Installing additional packages...'",
-      "sudo yum install -y git awscli htop",
+      "sudo dnf install -y git awscli htop",
       "echo 'Additional packages installation completed'"
     ]
   }
@@ -267,22 +266,24 @@ build {
       "echo 'Performing final cleanup and testing...'",
       "cd /opt/app",
       "npm test --if-present || echo 'No tests defined'",
-      "sudo yum clean all",
+      "sudo dnf clean all",
       "sudo rm -rf /tmp/*",
       "sudo rm -rf /var/tmp/*",
       "echo 'AMI preparation completed successfully'"
     ]
   }
-
   # Generate manifest for tracking
   post-processor "manifest" {
     output = "manifest.json"
     strip_path = true
     custom_data = {
       build_tool = "Packer"
-      project_name = var.project_name
-      environment = var.environment
       build_date = timestamp()
+      environment = var.environment
+      project_name = var.project_name
     }
   }
 }
+
+
+}  }    }      build_date = timestamp()      environment = var.environment      project_name = var.project_name
